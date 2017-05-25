@@ -8,6 +8,7 @@ from pysrt.srttime import SubRipTime
 from pysrt.comparablemixin import ComparableMixin
 from pysrt.compat import str, is_py2
 import re
+import langid
 
 
 class SubRipItem(ComparableMixin):
@@ -22,7 +23,7 @@ class SubRipItem(ComparableMixin):
     ITEM_PATTERN = str('%s\n%s --> %s%s\n%s\n')
     TIMESTAMP_SEPARATOR = '-->'
 
-    def __init__(self, index=0, start=None, end=None, text='', position=''):
+    def __init__(self, index=0, start=None, end=None, text='', position='', lang_map={}):
         try:
             self.index = int(index)
         except (TypeError, ValueError):  # try to cast as int, but it's not mandatory
@@ -32,6 +33,7 @@ class SubRipItem(ComparableMixin):
         self.end = SubRipTime.coerce(end or 0)
         self.position = str(position)
         self.text = str(text)
+        self.lang_map = lang_map
 
     @property
     def duration(self):
@@ -86,8 +88,18 @@ class SubRipItem(ComparableMixin):
         if cls.TIMESTAMP_SEPARATOR not in lines[0]:
             index = lines.pop(0)
         start, end, position = cls.split_timestamps(lines[0])
-        body = '\n'.join(lines[1:])
-        return cls(index, start, end, body, position)
+
+        text = '\n'.join(lines[1:])
+
+        body = {}
+        for l in lines[1:]:
+            lang_type = langid.classify(l)
+            if lang_type in body:
+                body[lang_type[0]] += l
+            else:
+                body[lang_type[0]] = l
+
+        return cls(index, start, end, text, position, body)
 
     @classmethod
     def split_timestamps(cls, line):
