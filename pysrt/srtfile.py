@@ -15,6 +15,9 @@ from pysrt.srtexc import Error
 from pysrt.srtitem import SubRipItem
 from pysrt.compat import str
 
+from functools import reduce
+
+
 BOMS = ((codecs.BOM_UTF32_LE, 'utf_32_le'),
         (codecs.BOM_UTF32_BE, 'utf_32_be'),
         (codecs.BOM_UTF16_LE, 'utf_16_le'),
@@ -50,6 +53,7 @@ class SubRipFile(UserList, object):
         self._eol = eol
         self.path = path
         self.encoding = encoding
+        self.langs = ['en', 'zh']
 
     def _get_eol(self):
         return self._eol or os.linesep
@@ -310,3 +314,105 @@ class SubRipFile(UserList, object):
             sys.stderr.write('PySRT-%s(line %s): \n' % (name, index))
             sys.stderr.write(error.args[0].encode('ascii', 'replace'))
             sys.stderr.write('\n')
+
+
+    def match(self, other):
+        assert type(other) == SubRipFile
+
+        self_num = len(self)
+        other_num = len(other)
+
+        i = 0
+        j = 0
+
+        ret = SubRipFile()
+
+        while i < self_num and j < other_num:
+            
+            other_bag = []
+            self_bag = []
+            
+            start_delta = self[i].start.ordinal - other[j].start.ordinal
+
+            end_delta = self[i].end.ordinal - other[j].end.ordinal
+
+            if abs(start_delta) <= 1000:
+                # 1 开始的误差都在可接受范围内，只有在这个条件下会匹配字幕
+                if abs(end_delta) <= 1000:
+                    # 1.1 结束的误差都在可接受范围内，则说明他们是同一条字幕
+                    # 增加一对匹配的字幕
+                    l_map = reduce(merge_dict, [self[i].lang_map, other[j].lang_map])
+                    # l_map.update(self.lang_map)
+                    # l_map.update(other.lang_map)
+                    ret.append(SubRipItem(start=self[i].start, end=self[i].end, lang_map=l_map))
+                    i += 1
+                    j += 1
+                    continue
+                elif end_delta > 1000:
+                    # 1.2 other中多条字幕匹配self中的一条字幕
+                    # 条件意义：当other中的字幕结束时间远小于
+                    if j+1 < other_num and other[j+1].end-self[i].end > 1000:
+                        # 1.2.1 如果other下一条字幕存在，且结束时间远大于当前字幕结束时间，不匹配跳过
+                        j+=1; i+=1
+                        continue
+                    # 如果下一条字幕存在，且结束时间远小于当前字幕结束时间，则说明other中多条字幕匹配当前字幕
+                    other_bag.append(other[j])
+                    while j+1 < other_num and other[j+1].end-self[i].end < 1000:
+                        # 获取到other中的多条字幕并且放入other_bag
+                        j += 1
+                        other_bag.append(other[j])
+
+                    # 当other_bag中当前条
+                    if abs(other[j].end-self[i].end) < 1000:
+                        # temp = " ".join(other_bag)
+                        # ret.append([self[i].start, self[i].end, self[i].text.replace("\n", " ").encode('utf8'), temp.replace("\n", " ").encode('utf8')])
+                        l_map = reduce(merge_dict, [i.lang_map for i in other_bag])
+                        ret.append(SubRipItem(start=self[i].start, end=self[i].end, lang_map=l_map))
+                        # print en_str_parsed[i].text.replace("\n", " ").encode('utf8'),temp.replace("\n", " ").encode('utf8')
+                    i += 1; j += 1
+                elif end_delta < -1000:
+                    # 1.3 self中的多条字幕匹配other中的一条字幕
+                    if i+1 < self_num and self[i+1].end - other[j].end > 1000:
+                        j+=1; i+=1
+                        continue
+                    self_bag.append(self[i])
+                    while i+1 < self_num and self[i+1].end-other[j].end < 1000:
+                        i += 1
+                        self_bag.append(self[i])
+                    if abs(self[i].end - other[j].end) < 1000:
+                        temp = " ".join(self_bag)
+                        ret.append([other[j].start, other[j].end,temp.replace("\n", " ").encode('utf8'), other[j].text.replace("\n", " ").encode('utf8')])
+                        l_map = reduce(merge_dict, [i.lang_map for i in self_bag])
+                        ret.append(SubRipItem(start=self[i].start, end=self[i].end, lang_map=l_map))
+                        # print zh_str_parsed[j].text.replace("\n", " ").encode('utf8'),temp.replace("\n", " ").encode('utf-8')
+                    i += 1
+                    j += 1
+            elif start_delta < -1000 :
+                i += 1
+            else :
+                j += 1
+
+        return ret
+
+    def build_corpus(self):
+        output_map = {l:open('{}.corpus'.format(l), 'w+') for l in self.langs}
+        lang_num = 2
+        for i in self:
+            if len(i.lang_map.keys()) == lang_num:
+                for key in output_map:
+                    output_map[key].write(i.lang_map.get(key, '') + '\n')
+
+        for l in output_map:
+            output_map[l].close()
+
+
+def merge_dict(d1, d2):
+    ret = {}
+    for key in set(list(d1.keys())+list(d2.keys())):
+        if key in d1 and key in d2:
+            ret[key] = d1[key] + d2[key]
+        else:
+            ret[key] = d1[key] if key in d1 else d2[key]
+    return ret
+
+testfile = "/Users/hyy/workflow/pysrt/Foxcatcher.2014.1080p.BluRay.x264-SPARKS.简体&英文.srt"
