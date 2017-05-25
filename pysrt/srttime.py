@@ -80,7 +80,8 @@ class SubRipTime(ComparableMixin):
         return self
 
     def __sub__(self, other):
-        return self.from_ordinal(self.ordinal - self.coerce(other).ordinal)
+        delta = self.ordinal - self.coerce(other).ordinal
+        return self.from_ordinal(delta)
 
     def __isub__(self, other):
         self.ordinal -= self.coerce(other).ordinal
