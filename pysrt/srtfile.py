@@ -2,6 +2,7 @@
 import os
 import sys
 import codecs
+import chardet
 
 try:
     from collections import UserList
@@ -9,13 +10,13 @@ except ImportError:
     from UserList import UserList
 
 from itertools import chain
+from functools import reduce
+from collections import Counter
 from copy import copy
 
 from pysrt.srtexc import Error
 from pysrt.srtitem import SubRipItem
 from pysrt.compat import str
-
-from functools import reduce
 
 
 BOMS = ((codecs.BOM_UTF32_LE, 'utf_32_le'),
@@ -53,7 +54,8 @@ class SubRipFile(UserList, object):
         self._eol = eol
         self.path = path
         self.encoding = encoding
-        self.langs = ['en', 'zh']
+        self.lang_stat = {}
+        self.langs = []
 
     def _get_eol(self):
         return self._eol or os.linesep
@@ -156,6 +158,19 @@ class SubRipFile(UserList, object):
         new_file = cls(path=path, encoding=encoding)
         new_file.read(source_file, error_handling=error_handling)
         source_file.close()
+        return new_file
+
+    @classmethod
+    def auto_open(cls, path='', error_handling=ERROR_PASS):
+        assert os.path.isfile(path)
+        f = open(path, 'rb')
+        content = f.read()
+        det_ret = chardet.detect(content)
+        content = content.decode(det_ret["encoding"], errors='replace')
+
+        new_file = cls(path=path, encoding=det_ret["encoding"])
+        new_file.read(content.splitlines(True), error_handling=error_handling)
+
         return new_file
 
     @classmethod
@@ -351,19 +366,19 @@ class SubRipFile(UserList, object):
                 elif end_delta > 1000:
                     # 1.2 other中多条字幕匹配self中的一条字幕
                     # 条件意义：当other中的字幕结束时间远小于
-                    if j+1 < other_num and other[j+1].end-self[i].end > 1000:
+                    if j+1 < other_num and other[j+1].end.ordinal - self[i].end.ordinal > 1000:
                         # 1.2.1 如果other下一条字幕存在，且结束时间远大于当前字幕结束时间，不匹配跳过
                         j+=1; i+=1
                         continue
                     # 如果下一条字幕存在，且结束时间远小于当前字幕结束时间，则说明other中多条字幕匹配当前字幕
                     other_bag.append(other[j])
-                    while j+1 < other_num and other[j+1].end-self[i].end < 1000:
+                    while j+1 < other_num and other[j+1].end.ordinal - self[i].end.ordinal < 1000:
                         # 获取到other中的多条字幕并且放入other_bag
                         j += 1
                         other_bag.append(other[j])
 
                     # 当other_bag中当前条
-                    if abs(other[j].end-self[i].end) < 1000:
+                    if abs(other[j].end.ordinal - self[i].end.ordinal) < 1000:
                         # temp = " ".join(other_bag)
                         # ret.append([self[i].start, self[i].end, self[i].text.replace("\n", " ").encode('utf8'), temp.replace("\n", " ").encode('utf8')])
                         l_map = reduce(merge_dict, [i.lang_map for i in other_bag])
@@ -372,16 +387,16 @@ class SubRipFile(UserList, object):
                     i += 1; j += 1
                 elif end_delta < -1000:
                     # 1.3 self中的多条字幕匹配other中的一条字幕
-                    if i+1 < self_num and self[i+1].end - other[j].end > 1000:
+                    if i+1 < self_num and self[i+1].end.ordinal - other[j].end.ordinal > 1000:
                         j+=1; i+=1
                         continue
                     self_bag.append(self[i])
-                    while i+1 < self_num and self[i+1].end-other[j].end < 1000:
+                    while i+1 < self_num and self[i+1].end.ordinal - other[j].end.ordinal < 1000:
                         i += 1
                         self_bag.append(self[i])
-                    if abs(self[i].end - other[j].end) < 1000:
-                        temp = " ".join(self_bag)
-                        ret.append([other[j].start, other[j].end,temp.replace("\n", " ").encode('utf8'), other[j].text.replace("\n", " ").encode('utf8')])
+                    if abs(self[i].end.ordinal - other[j].end.ordinal) < 1000:
+                        # temp = " ".join(self_bag)
+                        # ret.append([other[j].start, other[j].end,temp.replace("\n", " ").encode('utf8'), other[j].text.replace("\n", " ").encode('utf8')])
                         l_map = reduce(merge_dict, [i.lang_map for i in self_bag])
                         ret.append(SubRipItem(start=self[i].start, end=self[i].end, lang_map=l_map))
                         # print zh_str_parsed[j].text.replace("\n", " ").encode('utf8'),temp.replace("\n", " ").encode('utf-8')
@@ -392,13 +407,18 @@ class SubRipFile(UserList, object):
             else :
                 j += 1
 
+        ret.lang_stat = Counter(chain.from_iterable([i.lang_map.keys() for i in ret]))
+        ret.langs = [key for key in ret.lang_stat if ret.lang_stat[key] > int(len(ret)/10)]
+
         return ret
 
     def build_corpus(self):
-        output_map = {l:open('{}.corpus'.format(l), 'w+') for l in self.langs}
-        lang_num = 2
+        langs = set(self.langs)
+
+        output_map = {l:open('{}.corpus'.format(l), 'w+') for l in langs}
+
         for i in self:
-            if len(i.lang_map.keys()) == lang_num:
+            if set(i.lang_map.keys()) == langs:
                 for key in output_map:
                     output_map[key].write(i.lang_map.get(key, '') + '\n')
 
