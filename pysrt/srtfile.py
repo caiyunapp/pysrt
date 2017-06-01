@@ -423,7 +423,7 @@ class SubRipFile(UserList, object):
         for i in self:
             if set(i.lang_map.keys()) == langs:
                 for key in output_map:
-                    output_map[key].write(i.lang_map.get(key, '') + '\n')
+                    output_map[key].write(i.lang_map.get(key, '').encode('utf8') + '\n')
 
         for l in output_map:
             output_map[l].close()
