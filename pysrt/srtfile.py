@@ -412,10 +412,10 @@ class SubRipFile(UserList, object):
 
         return ret
 
-    def build_corpus(self):
+    def build_corpus(self, root='./'):
         langs = set(self.langs)
 
-        output_map = {l:open('{}.corpus'.format(l), 'w+') for l in langs}
+        output_map = {l:open('{}/{}.corpus'.format(root, l), 'a+') for l in langs}
 
         for i in self:
             if set(i.lang_map.keys()) == langs:
