@@ -171,6 +171,9 @@ class SubRipFile(UserList, object):
         new_file = cls(path=path, encoding=det_ret["encoding"])
         new_file.read(content.splitlines(True), error_handling=error_handling)
 
+        new_file.lang_stat = Counter(chain.from_iterable([i.lang_map.keys() for i in new_file]))
+        new_file.langs = [key for key in new_file.lang_stat if new_file.lang_stat[key] > int(len(new_file)/10)]
+
         return new_file
 
     @classmethod
