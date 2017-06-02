@@ -22,6 +22,7 @@ class SubRipItem(ComparableMixin):
     """
     ITEM_PATTERN = str('%s\n%s --> %s%s\n%s\n')
     TIMESTAMP_SEPARATOR = '-->'
+    MODIFIER = re.compile(r'\{.+?\}|<.+?>')
 
     def __init__(self, index=0, start=None, end=None, text='', position='', lang_map={}):
         try:
@@ -93,6 +94,7 @@ class SubRipItem(ComparableMixin):
 
         body = {}
         for l in lines[1:]:
+            l = MODIFIER.rep('', l)
             lang_type = langid.classify(l)
             if lang_type in body:
                 body[lang_type[0]] += l
