@@ -94,7 +94,7 @@ class SubRipItem(ComparableMixin):
 
         body = {}
         for l in lines[1:]:
-            l = MODIFIER.rep('', l)
+            l = MODIFIER.sub('', l)
             lang_type = langid.classify(l)
             if lang_type in body:
                 body[lang_type[0]] += l
