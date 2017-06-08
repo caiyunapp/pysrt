@@ -48,6 +48,7 @@ class SubRipFile(UserList, object):
     ERROR_RAISE = 2
 
     DEFAULT_ENCODING = 'utf_8'
+    SEGMENTATION = 4
 
     def __init__(self, items=None, eol=None, path=None, encoding='utf-8'):
         UserList.__init__(self, items or [])
@@ -172,7 +173,7 @@ class SubRipFile(UserList, object):
         new_file.read(content.splitlines(True), error_handling=error_handling)
 
         new_file.lang_stat = Counter(chain.from_iterable([i.lang_map.keys() for i in new_file]))
-        new_file.langs = [key for key in new_file.lang_stat if new_file.lang_stat[key] > int(len(new_file)/10)]
+        new_file.langs = [key for key in new_file.lang_stat if new_file.lang_stat[key] > int(len(new_file)/cls.SEGMENTATION)]
 
         return new_file
 
