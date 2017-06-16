@@ -385,7 +385,7 @@ class SubRipFile(UserList, object):
                     if abs(other[j].end.ordinal - self[i].end.ordinal) < 1000:
                         # temp = " ".join(other_bag)
                         # ret.append([self[i].start, self[i].end, self[i].text.replace("\n", " ").encode('utf8'), temp.replace("\n", " ").encode('utf8')])
-                        l_map = reduce(merge_dict, [i.lang_map for i in other_bag])
+                        l_map = reduce(merge_dict, [e.lang_map for e in other_bag])
                         ret.append(SubRipItem(start=self[i].start, end=self[i].end, lang_map=l_map))
                         # print en_str_parsed[i].text.replace("\n", " ").encode('utf8'),temp.replace("\n", " ").encode('utf8')
                     i += 1; j += 1
@@ -401,7 +401,7 @@ class SubRipFile(UserList, object):
                     if abs(self[i].end.ordinal - other[j].end.ordinal) < 1000:
                         # temp = " ".join(self_bag)
                         # ret.append([other[j].start, other[j].end,temp.replace("\n", " ").encode('utf8'), other[j].text.replace("\n", " ").encode('utf8')])
-                        l_map = reduce(merge_dict, [i.lang_map for i in self_bag])
+                        l_map = reduce(merge_dict, [e.lang_map for e in self_bag])
                         ret.append(SubRipItem(start=self[i].start, end=self[i].end, lang_map=l_map))
                         # print zh_str_parsed[j].text.replace("\n", " ").encode('utf8'),temp.replace("\n", " ").encode('utf-8')
                     i += 1
